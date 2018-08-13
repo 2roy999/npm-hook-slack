@@ -1,54 +1,42 @@
-var
-	assert       = require('assert'),
-	bole         = require('bole'),
-	logstring    = require('common-log-string'),
+const assert = require('assert'),
+	bole = require('bole'),
+	logstring = require('common-log-string'),
 	makeReceiver = require('npm-hook-receiver'),
-	slack        = require('@slack/client')
-	;
+	slack = require('@slack/client')
 
-var logger = bole(process.env.SERVICE_NAME || 'hooks-bot');
+const logger = bole(process.env.SERVICE_NAME || 'hooks-bot')
 bole.output({ level: 'info', stream: process.stdout });
 
-var token = process.env.SLACK_API_TOKEN || '';
+const token = process.env.SLACK_API_TOKEN || ''
 assert(token, 'you must supply a slack api token in process.env.SLACK_API_TOKEN');
-var channelID = process.env.SLACK_CHANNEL;
+const channelID = process.env.SLACK_CHANNEL
 assert(channelID, 'you must supply a slack channel ID in process.env.SLACK_CHANNEL');
-var port = process.env.PORT || '6666';
+const port = process.env.PORT || '6666'
 
 // This is how we post to slack.
-var web = new slack.WebClient(token);
+const web = new slack.WebClient(token)
 
 // Make a webhooks receiver and have it act on interesting events.
 // The receiver is a restify server!
-var opts = {
-	name:   process.env.SERVICE_NAME || 'hooks-bot',
+const opts = {
+	name: process.env.SERVICE_NAME || 'hooks-bot',
 	secret: process.env.SHARED_SECRET,
-	mount:  process.env.MOUNT_POINT || '/incoming',
-};
-var server = makeReceiver(opts);
+	mount: process.env.MOUNT_POINT || '/incoming',
+}
+const server = makeReceiver(opts)
 
 // All hook events, with special handling for some.
 server.on('hook', function onIncomingHook(hook)
 {
-	var pkg = hook.name.replace('/', '%2F');
-	var type = hook.type;
-	var change = hook.event.replace(type + ':', '');
+	const pkg = hook.name.replace('/', '%2F')
+	const type = hook.type
+	const change = hook.event.replace(type + ':', '')
 
-	var message, highlightedVersion;
+	let message, highlightedVersion
 	logger.info('hook', JSON.stringify(hook));
-	var user = hook.change ? hook.change.user : '';
-	var maintainer = hook.change.maintainer;
 
 	switch (hook.event)
 	{
-	case 'package:star':
-		message = `:package::star: *starred*`;
-		break;
-
-	case 'package:unstar':
-		message = `:package::disappointed: *unstarred*`;
-		break;
-
 	case 'package:publish':
 		highlightedVersion = hook.change.version;
 		message = `:package::sparkles: *published*`;
@@ -64,49 +52,24 @@ server.on('hook', function onIncomingHook(hook)
 		message = `:package::skull_and_crossbones: *deprecated*`;
 		break;
 
-	case 'package:undeprecated':
-		highlightedVersion = hook.change.deprecated;
-		message = `:package::worried: *undeprecated*`;
-		break;
-
-	case 'package:dist-tag':
-		var distTag = hook.change['dist-tag'];
-		highlightedVersion = hook.payload['dist-tags'][distTag];
-		message = `:package::label: added a *dist-tag*: \`${distTag}\``;
-		break;
-
-	case 'package:dist-tag-rm':
-		message = `:package::fire: removed a *dist-tag*: \`${hook.change['dist-tag']}\``;
-		break;
-
-	case 'package:owner':
-		message = `:package::information_desk_person: added an owner: <https://www.npmjs.com/~${maintainer}|\`${maintainer}\`>`;
-		break;
-
-	case 'package:owner-rm':
-		message = `:package::no_good: removed an owner: <https://www.npmjs.com/~${maintainer}|\`${maintainer}\`>`;
-		break;
-
 	default:
-		message = `:package: *event*: \`${change}\` | *type*: \`${type}\``;
+		return
 	}
 
-	var attachment = {
+	const attachment = {
 		fallback: `name: '${pkg}' | event: '${change}' | type: '${type}'`,
 		text: `_${message}_`,
 		color: '#cb3837',
 		title: hook.name,
 		title_link: `https://www.npmjs.com/package/${pkg}`,
-		mrkdwn_in: [ 'text', 'pretext' ]
-	};
+		mrkdwn_in: ['text', 'pretext']
+	}
 
 	if (highlightedVersion) {
 		attachment.author_name = `v${highlightedVersion}`;
 		attachment.author_icon = `https://cdn.rawgit.com/npm/logos/373398ec73257954872124f3224ff90e62f2635c/npm%20square/n-large.png`;
 	}
 
-	logger.info('message', JSON.stringify(messageOpts));
-	web.chat.postMessage(channelID, '', messageOpts);
 	web.chat.postMessage({
 		channel: channelID,
 		text: message,
