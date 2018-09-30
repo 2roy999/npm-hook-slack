@@ -33,7 +33,7 @@ server.on('hook', function onIncomingHook(hook)
 	const change = hook.event.replace(type + ':', '')
 
 	let message, highlightedVersion
-	logger.info('hook', JSON.stringify(hook));
+	logger.info('Received ', type, ' hook for ', change, ' in package ', pkg);
 
 	switch (hook.event)
 	{
